@@ -12,7 +12,7 @@ protocol.
 
 The
 [Lua socket](http://w3.impa.br/~diego/software/luasocket/home.html)
-library.
+library is **required**.
 
 On debian based systems you can get it with:
 
