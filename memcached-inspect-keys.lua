@@ -98,7 +98,8 @@ local r = send_memcache_command(host, port, 'stats items', timeout)
 local nbr_slabs, nbr_items, tsize = 0, 0, 0
 -- Print the headers.
 print(string.format('%-72s %-12s %-20s', 'key', 'size', 'expires'))
-print_separator(104)
+print_separator(106)
+
 
 local slabs = {}
 -- Looping over all lines.
@@ -122,5 +123,5 @@ for k, line in pairs(r) do
 end -- line
 
 -- Print the totals of slabs and items.
-print_separator(104)
+print_separator(106)
 print(string.format('total: %d items in %d slabs [size: %d]\n', nbr_items, nbr_slabs, tsize))
