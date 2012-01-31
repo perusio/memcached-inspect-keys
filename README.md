@@ -55,7 +55,7 @@ On debian based systems you can get it with:
     
     * port: `11211`
     
-    * timeout: `5 ms`
+    * timeout: `10 ms`
     
     * dump limit: `100` items.
 
