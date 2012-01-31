@@ -70,7 +70,7 @@ function send_memcache_command(server, port, command, ctimeout)
    while true do
       -- Read from the socket.
       local s, status, partial = client:receive()
-      -- Exit if we reach any of the above states.
+      -- Exit if we reach any of these states.
       if s == 'END\r\n'
          or s == 'DELETED\r\n'
          or s == 'OK\r\n'
