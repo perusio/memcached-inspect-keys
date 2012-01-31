@@ -20,7 +20,9 @@ On debian based systems you can get it with:
 
 ## Installation & Usage
 
- 1. Clone the [repo].
+ 1. Clone the repo:
+    
+        git clone git://github.com/perusio/memcached-inspect-keys.git
  
  2. Run the script to get the stats for a given instance:
 
