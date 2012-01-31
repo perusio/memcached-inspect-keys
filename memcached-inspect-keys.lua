@@ -31,20 +31,27 @@
 -- Use the Lua socket library.
 local socket = require('socket')
 
+-- Print the usage instructions.
+if #arg == 1 and (arg[1] == '-h' or arg[1] == '--help') then
+   print(string.format('Usage: %s <host> <port> <timeout> [dump_limit]', arg[0]))
+   os.exit(1)
+end
+
 -- Get the host, port, dump_limit and connect timeout.
 local __defaults = { port = '11211',
                      host = 'localhost',
-                     dump_limit = 100,
-                     timeout = 1 } -- defaults
+                     timeout = 1,
+                     dump_limit = 100 } -- defaults
+
 local host = (not arg[1] and __defaults['host']) or arg[1]
 local port = (not arg[2] and __defaults['port']) or arg[2]
-local dump_limit = (not arg[3] and __defaults['dump_limit']) or arg[3]
+local dump_limit = (not arg[4] and __defaults['dump_limit']) or arg[4]
 local timeout
--- Set a very short timeout (50 ms) if the server is on the loopback.
-if not arg[4] and host == 'localhost' then
-   timeout = 0.05
+-- Set a very short timeout (10 ms) if the server is on the loopback.
+if not arg[3] and host == 'localhost' then
+   timeout = 0.001
 else -- otherwise use 1s as the default or set to the given value
-   timeout = (not arg[4] and __defaults['timeout']) or arg[4]
+   timeout = (not arg[3] and __defaults['timeout']) or arg[3]
 end
 
 -- Sends a memcache command.
@@ -59,8 +66,8 @@ function send_memcache_command(server, port, command, ctimeout)
    -- Table to store the response.
    local response = {}
    while true do
-      -- Read from the socket in 256 byte sized chunks.
-      local s, status, partial = client:receive(256)
+      -- Read from the socket.
+      local s, status, partial = client:receive()
       -- Exit if we reach any of the above states.
       if s == 'END\r\n'
          or s == 'DELETED\r\n'
@@ -92,20 +99,28 @@ local nbr_slabs, nbr_items, tsize = 0, 0, 0
 -- Print the headers.
 print(string.format('%-72s %-12s %-20s', 'key', 'size', 'expires'))
 print_separator(104)
+
+local slabs = {}
 -- Looping over all lines.
-for k,line in pairs(r) do
-   local slab = string.match(line, 'STAT items:(%d+):') -- get the slab number
-   nbr_slabs = nbr_slabs + 1
-   local str = send_memcache_command(host, port, 'stats cachedump ' .. slab .. ' ' .. dump_limit, timeout)
-   for k, s in pairs(str) do -- loop on each slab for all the items
-      for key, size, expire in string.gmatch(s, 'ITEM ([^%s]+) %[(%d+) b; (%d+) s%]') do
-         -- Print the keys, size and expire date for each item on this slab.
-         nbr_items = nbr_items + 1
-         tsize = tsize + size
-         print(string.format('%-72s %-12d %-20s', key, size, os.date('%d.%b.%Y %H:%M:%S', expire)))
-      end -- items
-   end  -- slab
+for k, line in pairs(r) do
+   local slab_nbr = string.match(line, 'STAT items:(%d+):') -- get the slab number
+   if slab_nbr and not slabs[slab_nbr] then -- proceed only if the slab is 'new'
+      slabs[slab_nbr] = true -- store the slab number to avoid repetition
+      nbr_slabs = nbr_slabs + 1
+      local str = send_memcache_command(host, port,
+                                        'stats cachedump ' .. slab_nbr .. ' ' .. dump_limit,
+                                        timeout)
+      for k, s in pairs(str) do -- loop on each slab for all the items
+         for key, size, expire in string.gmatch(s, 'ITEM ([^%s]+) %[(%d+) b; (%d+) s%]') do
+            -- Print the keys, size and expire date for each item on this slab.
+            nbr_items = nbr_items + 1 -- total number of items
+            tsize = tsize + size -- total size in bytes
+            print(string.format('%-72s %-12d %-20s', key, size, os.date('%d.%b.%Y %H:%M:%S', expire)))
+         end -- items
+      end  -- slab loop
+   end -- slab table (item)
 end -- line
+
 -- Print the totals of slabs and items.
 print_separator(104)
 print(string.format('total: %d items in %d slabs [size: %d]\n', nbr_items, nbr_slabs, tsize))
