@@ -31,14 +31,8 @@
 -- Use the Lua socket library.
 local socket = require('socket')
 
--- Print the usage instructions.
-if #arg == 1 and (arg[1] == '-h' or arg[1] == '--help') then
-   print(string.format('Usage: %s <host> <port> <timeout> [dump_limit]', arg[0]))
-   os.exit(1)
-end
-
 -- Get the host, port, dump_limit and connect timeout.
-local __defaults = { port = '11211',
+local __defaults = { port = 11211,
                      host = 'localhost',
                      timeout = 1,
                      dump_limit = 100 } -- defaults
@@ -46,12 +40,20 @@ local __defaults = { port = '11211',
 local host = (not arg[1] and __defaults['host']) or arg[1]
 local port = (not arg[2] and __defaults['port']) or arg[2]
 local dump_limit = (not arg[4] and __defaults['dump_limit']) or arg[4]
-local timeout
 -- Set a very short timeout (10 ms) if the server is on the loopback.
-if not arg[3] and host == 'localhost' then
-   timeout = 0.001
-else -- otherwise use 1s as the default or set to the given value
-   timeout = (not arg[3] and __defaults['timeout']) or arg[3]
+local timeout = 0.001
+if not arg[3] and host ~= 'localhost' then
+   timeout = __defaults['timeout']
+elseif arg[3] then
+   timeout = arg[3]
+end
+
+-- Print the usage instructions.
+if #arg == 1 and (arg[1] == '-h' or arg[1] == '--help') then
+   print(string.format('Usage: %s <host> <port> <timeout> [dump_limit]', arg[0]))
+   print(string.format('defaults\nhost: %s\nport: %d\ntimeout: %f\ndump_limit: %d',
+                       'localhost', port, 0.001, dump_limit))
+   os.exit(1)
 end
 
 -- Sends a memcache command.
@@ -100,17 +102,16 @@ local nbr_slabs, nbr_items, tsize = 0, 0, 0
 print(string.format('%-72s %-12s %-20s', 'key', 'size', 'expires'))
 print_separator(106)
 
-
 local slabs = {}
 -- Looping over all lines.
 for k, line in pairs(r) do
    local slab_nbr = string.match(line, 'STAT items:(%d+):') -- get the slab number
    if slab_nbr and not slabs[slab_nbr] then -- proceed only if the slab is 'new'
       slabs[slab_nbr] = true -- store the slab number to avoid repetition
-      nbr_slabs = nbr_slabs + 1
+      nbr_slabs = nbr_slabs + 1 -- get the number of slabs (cannot use # - table is sparse)
       local str = send_memcache_command(host, port,
                                         'stats cachedump ' .. slab_nbr .. ' ' .. dump_limit,
-                                        timeout)
+                                        timeout) -- dump the items in each slab
       for k, s in pairs(str) do -- loop on each slab for all the items
          for key, size, expire in string.gmatch(s, 'ITEM ([^%s]+) %[(%d+) b; (%d+) s%]') do
             -- Print the keys, size and expire date for each item on this slab.
